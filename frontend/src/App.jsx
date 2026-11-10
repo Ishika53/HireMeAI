@@ -3,6 +3,9 @@ import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import './App.css'
 
+// Backend URL
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+
 function App() {
   const [question, setQuestion] = useState('')
   const [history, setHistory] = useState([])
@@ -21,7 +24,7 @@ function App() {
   useEffect(() => {
     async function loadHistory() {
       try {
-        const response = await fetch('http://127.0.0.1:8000/history')
+        const response = await fetch(`${API_URL}/history`)
 
         if (!response.ok) {
           throw new Error('Unable to load chat history')
@@ -76,7 +79,7 @@ function App() {
     setQuestion('')
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/chat', {
+      const response = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -121,7 +124,7 @@ function App() {
 
     } catch (error) {
       const errorMessage =
-        'Unable to get an answer. Please check whether the backend is running.'
+        'Unable to get an answer. Please check your backend connection.'
 
       setMessages((previousMessages) =>
         previousMessages.map((item) => {
