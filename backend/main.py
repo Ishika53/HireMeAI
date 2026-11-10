@@ -1,5 +1,6 @@
 
 import json
+import base64
 import os
 from pathlib import Path
 from datetime import datetime, timezone
@@ -190,10 +191,16 @@ def load_candidate_resume():
 
     print("MongoDB connected successfully!")
 
-    pdf_path = Path("/etc/secrets/my_resume.pdf")
 
-    if not pdf_path.exists():
-        pdf_path = Path(__file__).resolve().parent / "my_resume.pdf"
+pdf_path = Path("/etc/secrets/my_resume.pdf")
+
+if pdf_path.exists():
+    encoded_pdf = pdf_path.read_text()
+    decoded_pdf = base64.b64decode(encoded_pdf)
+    pdf_path = Path("/tmp/my_resume.pdf")
+    pdf_path.write_bytes(decoded_pdf)
+else:
+    pdf_path = Path(__file__).resolve().parent / "my_resume.pdf"
 
     print("Loading candidate resume...")
 
