@@ -31,7 +31,7 @@ model = "openai/gpt-oss-120b"
 mongodb_url = os.getenv("MONGODB_URL")
 
 if not mongodb_url:
-    raise ValueError("MONGODB_URL is missing from .env file")
+    raise ValueError("MONGODB_URL is missing")
 
 mongo_client = MongoClient(
     mongodb_url,
@@ -39,7 +39,6 @@ mongo_client = MongoClient(
 )
 
 database = mongo_client["hiremeai"]
-
 chat_collection = database["chat_history"]
 
 
@@ -95,7 +94,7 @@ candidate_resume = None
 
 def read_pdf(file_path: Path):
 
-    reader = PdfReader(file_path)
+    reader = PdfReader(str(file_path))
 
     text = ""
 
@@ -104,6 +103,9 @@ def read_pdf(file_path: Path):
 
         if page_text:
             text += page_text + "\n"
+
+    if not text.strip():
+        raise ValueError("No readable text found in the resume PDF.")
 
     return text
 
@@ -151,20 +153,18 @@ def parse_resume(resume_text):
     {resume_text}
     """
 
-    messages = [
-        {
-            "role": "system",
-            "content": system_prompt
-        },
-        {
-            "role": "user",
-            "content": user_prompt
-        }
-    ]
-
     response = client.chat.completions.create(
         model=model,
-        messages=messages,
+        messages=[
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user",
+                "content": user_prompt
+            }
+        ],
         response_format={
             "type": "json_object"
         }
@@ -179,7 +179,7 @@ def parse_resume(resume_text):
     return resume
 
 
-# Load and parse resume only once when backend starts
+# Load and parse resume when backend starts
 
 @app.on_event("startup")
 def load_candidate_resume():
@@ -191,20 +191,36 @@ def load_candidate_resume():
 
     print("MongoDB connected successfully!")
 
+    # Check Render Secret File first
+    secret_path = Path("/etc/secrets/my_resume.pdf")
 
-pdf_path = Path("/etc/secrets/my_resume.pdf")
+    if secret_path.exists():
 
-if pdf_path.exists():
-    encoded_pdf = pdf_path.read_text()
-    decoded_pdf = base64.b64decode(encoded_pdf)
-    pdf_path = Path("/tmp/my_resume.pdf")
-    pdf_path.write_bytes(decoded_pdf)
-else:
-    pdf_path = Path(__file__).resolve().parent / "my_resume.pdf"
+        print("Loading resume from Render Secret File...")
 
-    print("Loading candidate resume...")
+        encoded_pdf = secret_path.read_text().strip()
+
+        decoded_pdf = base64.b64decode(encoded_pdf)
+
+        pdf_path = Path("/tmp/my_resume.pdf")
+
+        pdf_path.write_bytes(decoded_pdf)
+
+    else:
+
+        # Use local PDF during development
+        print("Loading resume from local folder...")
+
+        pdf_path = Path(__file__).resolve().parent / "my_resume.pdf"
+
+    if not pdf_path.exists():
+        raise FileNotFoundError("my_resume.pdf was not found.")
+
+    print("Reading candidate resume...")
 
     resume_text = read_pdf(pdf_path)
+
+    print("Parsing candidate resume...")
 
     candidate_resume = parse_resume(resume_text)
 
@@ -286,7 +302,6 @@ def chat(request: ChatRequest):
         candidate_resume
     )
 
-    # Save question and answer in MongoDB
     created_at = datetime.now(timezone.utc)
 
     chat_document = {
@@ -323,7 +338,6 @@ def get_history():
             .limit(100)
         )
 
-        # Reverse to show oldest question first
         history_documents.reverse()
 
         history = []
