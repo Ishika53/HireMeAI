@@ -190,7 +190,10 @@ def load_candidate_resume():
 
     print("MongoDB connected successfully!")
 
-    pdf_path = Path(__file__).resolve().parent / "my_resume.pdf"
+    pdf_path = Path("/etc/secrets/my_resume.pdf")
+
+    if not pdf_path.exists():
+        pdf_path = Path(__file__).resolve().parent / "my_resume.pdf"
 
     print("Loading candidate resume...")
 
